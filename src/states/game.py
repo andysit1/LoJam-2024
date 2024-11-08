@@ -48,7 +48,6 @@ class Inventory:
 
 
 class Player(pg.sprite.Sprite):
-
     def __init__(self, pos, *groups):
         super().__init__(*groups)
         self.image = pg.Surface((30, 30))
@@ -59,19 +58,17 @@ class Player(pg.sprite.Sprite):
         self.speed = 1
 
         self.block_inventory = Inventory()
+
+
         block1 = SquareMovingSprite(self, groups)
         block2 = SquareMovingSprite(self, groups)
         block3 = SquareMovingSprite(self, groups)
 
         block2.make_transpart()
         block3.make_transpart()
-
         self.block_inventory.blocks = [block1, block2, block3]
         self.block : SquareMovingSprite = self.block_inventory.get_current_block()
         self.placed_blocks : pg.sprite.Group = pg.sprite.Group()
-
-    # def place_block(self):
-
 
     def input(self, event):
         ## movement
@@ -144,8 +141,6 @@ class GameState(State):
     self.engine = engine
     self.character_sprite = pg.sprite.Group()
 
-    #bo
-
     self.bo_width, self.bo_height = 1280 - 200, 720 - 200
     self.trigger_zone1 = pg.Rect((self.bo_width // 3) + 100, 0, self.bo_width // 3, 720)
     self.trigger_zone2 = pg.Rect((self.bo_width // 3) * 2 + 100, 0, self.bo_width // 3, 720)
@@ -162,7 +157,6 @@ class GameState(State):
     door.rect.x, door.rect.y = self.end_pos.x, self.end_pos.y
 
     self.bo = []
-
     blockSize = 40 #Set the size of the grid block
     for x in range(100, self.bo_width + 100, blockSize):
         for y in range(100, self.bo_height + 100, blockSize):
@@ -256,8 +250,6 @@ class GameState(State):
       pg.draw.polygon(surface, (100, 100, 100), right_trapezoid)
       pg.draw.polygon(surface, (50, 50, 50), left_trapezoid)
 
-
-
   def proj_update(self, delta):
       for proj in self.t_list:
         proj.update(delta)
@@ -267,7 +259,6 @@ class GameState(State):
         if proj.is_colliding_player(self.player):
            print("DIED")
            self.engine.machine.next_state = GameState(engine=self.engine)
-
 
         if shot_to_remove and sprite:
             proj.shots.remove(shot_to_remove)
@@ -290,8 +281,8 @@ class GameState(State):
       self.character_sprite.update(delta)
       self.game_ending_door.update(delta)
 
-    #   if pg.sprite.groupcollide(self.pits, self.character_sprite):
-        #  self.player
+      if pg.sprite.groupcollide(self.pits, self.character_sprite, dokilla=False, dokillb=False):
+         self.engine.machine.next_state = GameState(engine=self.engine)
 
       if pg.sprite.groupcollide(self.character_sprite, self.game_ending_door, dokilla=False, dokillb=False):
          print("WIN")
