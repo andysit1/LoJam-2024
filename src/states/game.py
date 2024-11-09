@@ -11,9 +11,6 @@ from pygame.math import Vector2
 from random import randint
 
 
-
-
-
 #represents the current block in hand
 class Inventory:
     def __init__(self):
@@ -58,16 +55,20 @@ class Player(pg.sprite.Sprite):
         self.speed = 1
 
         self.block_inventory = Inventory()
+        
 
-
-        block1 = SquareMovingSprite(self, groups)
-        block2 = SquareMovingSprite(self, groups)
-        block3 = SquareMovingSprite(self, groups)
+        self.block_inventory_group = pg.sprite.Group()
+       
+        block1 = SquareMovingSprite(self, self.block_inventory_group)
+        block2 = SquareMovingSprite(self, self.block_inventory_group)
+        block3 = SquareMovingSprite(self, self.block_inventory_group)
 
         block2.make_transpart()
         block3.make_transpart()
         self.block_inventory.blocks = [block1, block2, block3]
         self.block : SquareMovingSprite = self.block_inventory.get_current_block()
+        self.block_group : pg.sprite.GroupSingle = pg.sprite.GroupSingle()
+
         self.placed_blocks : pg.sprite.Group = pg.sprite.Group()
 
     def input(self, event):
@@ -88,7 +89,7 @@ class Player(pg.sprite.Sprite):
                self.placed_blocks.add(self.block)
                #get new...
                self.block = self.block_inventory.get_next_possible()
-
+               
 
 
         elif event.type == pg.KEYUP:
@@ -137,7 +138,9 @@ class Pit(pg.sprite.Sprite):
 
 
 class GameState(State):
-  def __init__(self, engine):
+  def __init__(self, engine, hardness_scale : int = 1):
+    self.hard_level : int = hardness_scale
+
     self.engine = engine
     self.character_sprite = pg.sprite.Group()
 
@@ -168,18 +171,13 @@ class GameState(State):
                 if randint(0, 10) == 0:
                     #add change of pit spawn
                     Pit(self.pits).rect.topleft = (x, y)
-
-
             self.bo.append(rect)
-
-
 
     self.projectiles_grp = pg.sprite.Group()
     self.projectiles = HProjectiles(self.character_sprite)
-    self.t_projectiles = TravelProjectiles(self.projectiles_grp)
     self.t_list = []
-
     self.init_t_projectiles()
+    self.flying : bool = False
 
   def init_t_projectiles(self):
         #top down
@@ -208,7 +206,6 @@ class GameState(State):
             self.t_list.append(t)
             self.t_list.append(t2)
 
-
   def draw_grid(self, surface):
       for rect in self.bo:
          pg.draw.rect(surface, "grey", rect, 1)
@@ -221,8 +218,10 @@ class GameState(State):
       self.pits.draw(surface)
       pg.draw.rect(surface, BLUE, (100, 100, self.bo_width, self.bo_height), 2)
       self.character_sprite.draw(surface)
-      self.projectiles.draw_shot(surface)
-      self.t_projectiles.draw_shot(surface)
+
+      if self.player.block:
+        surface.blit(self.player.block.image, self.player.block.rect)
+
       for proj in self.t_list:
          proj.draw_shot(surface)
 
@@ -231,7 +230,6 @@ class GameState(State):
       pg.draw.rect(surface, "white", (0, 620, 1280, 100))
       pg.draw.rect(surface, "white", (0, 0, 100, 720))
       pg.draw.rect(surface, "white", (1180, 0, 100, 720))
-
 
       self.game_ending_door.draw(surface)
       ## Rectangle dimensions and offset
@@ -251,11 +249,15 @@ class GameState(State):
       pg.draw.polygon(surface, (50, 50, 50), left_trapezoid)
 
   def proj_update(self, delta):
+      if self.player.block:
+        self.player.block.update(delta)
+
       for proj in self.t_list:
         proj.update(delta)
 
-        shot_to_remove, sprite = proj.is_colliding_group(self.player.placed_blocks)
 
+        # logic for placed block interaction
+        shot_to_remove, sprite = proj.is_colliding_group(self.player.placed_blocks)
         if proj.is_colliding_player(self.player):
            print("DIED")
            self.engine.machine.next_state = GameState(engine=self.engine)
@@ -264,29 +266,39 @@ class GameState(State):
             proj.shots.remove(shot_to_remove)
             self.character_sprite.remove(sprite)
             self.player.placed_blocks.remove(sprite)
+
+        #logic for when proj and block flying
         try:
             shot = proj.is_colliding_block(self.player.block)
             if shot:
-                self.player.flying = True
                 self.player.pos += shot['direction'] * shot['speed'] * delta
                 self.player.rect.center = self.player.pos
-            else:
-                self.player.flying = False
+                self.flying = True
+                
         except:
             pass
 
   def on_update(self, delta):
       self.projectiles.update(delta)
-      self.proj_update(delta)
       self.character_sprite.update(delta)
       self.game_ending_door.update(delta)
+      self.proj_update(delta)
 
       if pg.sprite.groupcollide(self.pits, self.character_sprite, dokilla=False, dokillb=False):
-         self.engine.machine.next_state = GameState(engine=self.engine)
-
+        if not self.flying:
+            self.engine.machine.next_state = GameState(engine=self.engine)
+        
+        self.flying = False
       if pg.sprite.groupcollide(self.character_sprite, self.game_ending_door, dokilla=False, dokillb=False):
          print("WIN")
          #trigger game winning
+
+         if self.hard_level == 3:
+            # send them to win state
+            pass
+         
+         self.engine.machine.next_state = GameState(engine=self.engine, hardness_scale=self.hard_level + 1)
+
 
 
   def on_event(self, event):
